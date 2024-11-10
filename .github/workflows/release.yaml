@@ -31,7 +31,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Create a new tag based on the current date-time or use latest commit SHA
-            TAG="manual-$(date +'%Y%m%d%H%M')"
+            TAG="manual-$(date +'%Y%m%d%H%M%S')"
             git tag "$TAG"
             git push origin "$TAG"
           else
@@ -46,10 +46,12 @@ jobs:
           CGO_ENABLED: 0
         run: |
           mkdir -p build
-          go build -o build/OpenGFW-${GOOS}-${GOARCH} -ldflags "-s -w" .
+          OUTPUT_NAME="OpenGFW-${GOOS}-${GOARCH}"
+          go build -o build/$OUTPUT_NAME -ldflags "-s -w" .
+          zip -j build/${OUTPUT_NAME}.zip build/$OUTPUT_NAME
 
       - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: build/*
+          files: build/*.zip # Uploads each individual zip file
           tag_name: ${{ steps.tag.outputs.TAG }}
