@@ -1,4 +1,4 @@
-module github.com/apernet/OpenGFW
+module github.com/X2ET/XGFW
 
 go 1.21
 
