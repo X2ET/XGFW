@@ -1,55 +1,87 @@
 name: Release
 on:
-  release:
-    types: [published]
-  workflow_dispatch: # Allows manual triggering of the workflow
+  push:
+    tags:
+      - "*"  # Trigger on push to any tag
+  workflow_dispatch:  # Allow manual triggering
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  releases-matrix:
-    name: Release Go Binary
+  release-binaries:
+    name: Release Go Binary for Multiple Architectures
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [linux]
-        goarch: ["386", amd64, arm64]
+        platform:
+          - amd64
+          - arm64
+          - armv7
+          - armv6
+          - armv5
+          - 386
+          - s390x
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version-file: go.mod
 
-      # Ensure a tag exists, create one if running manually
-      - name: Ensure Git Tag
-        id: tag
+      - name: Install dependencies
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Create a new tag based on the current date-time or use latest commit SHA
-            TAG="manual-$(date +'%Y%m%d%H%M%S')"
-            git tag "$TAG"
-            git push origin "$TAG"
-          else
-            TAG="${{ github.ref_name }}"
+          sudo apt-get update
+          if [ "${{ matrix.platform }}" == "arm64" ]; then
+            sudo apt install gcc-aarch64-linux-gnu
+          elif [ "${{ matrix.platform }}" == "armv7" ]; then
+            sudo apt install gcc-arm-linux-gnueabihf
+          elif [ "${{ matrix.platform }}" == "armv6" ]; then
+            sudo apt install gcc-arm-linux-gnueabihf
+          elif [ "${{ matrix.platform }}" == "armv5" ]; then
+            sudo apt install gcc-arm-linux-gnueabi
+          elif [ "${{ matrix.platform }}" == "386" ]; then
+            sudo apt install gcc-i686-linux-gnu
+          elif [ "${{ matrix.platform }}" == "s390x" ]; then
+            sudo apt install gcc-s390x-linux-gnu
           fi
-          echo "::set-output name=TAG::$TAG"
 
-      - name: Build
+      - name: Build Binary
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: ${{ matrix.platform }}
+          CGO_ENABLED: 1
         run: |
-          mkdir -p build
-          go build -o build/OpenGFW-${GOOS}-${GOARCH} -ldflags "-s -w" .
+          # Set up platform-specific environment variables if needed
+          if [ "${{ matrix.platform }}" == "arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
+          elif [ "${{ matrix.platform }}" == "armv7" ]; then
+            export GOARM=7
+            export CC=arm-linux-gnueabihf-gcc
+          elif [ "${{ matrix.platform }}" == "armv6" ]; then
+            export GOARM=6
+            export CC=arm-linux-gnueabihf-gcc
+          elif [ "${{ matrix.platform }}" == "armv5" ]; then
+            export GOARM=5
+            export CC=arm-linux-gnueabi-gcc
+          elif [ "${{ matrix.platform }}" == "386" ]; then
+            export CC=i686-linux-gnu-gcc
+          elif [ "${{ matrix.platform }}" == "s390x" ]; then
+            export CC=s390x-linux-gnu-gcc
+          fi
 
-      - name: Upload
+          # Build binary
+          go build -o "OpenGFW-${{ matrix.platform }}" -ldflags "-s -w" .
+
+      - name: Upload Binary
         uses: softprops/action-gh-release@v2
         with:
-          files: build/*
-          tag_name: ${{ steps.tag.outputs.TAG }}
+          files: "OpenGFW-${{ matrix.platform }}"  # Upload individual file
+          tag_name: ${{ github.ref }}  # Tag is necessary to associate with the release
+          prerelease: true  # Set to true if you want a pre-release; otherwise, remove this line
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
