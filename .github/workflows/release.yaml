@@ -2,6 +2,7 @@ name: Release
 on:
   release:
     types: [published]
+  workflow_dispatch: # Allows manual triggering of the workflow
 
 permissions:
   contents: write
