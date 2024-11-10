@@ -31,7 +31,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Create a new tag based on the current date-time or use latest commit SHA
-            TAG="manual-$(date +'%Y%m%d%H%M%S')"
+            TAG="manual-$(date +'%Y%m%d%H%M')"
             git tag "$TAG"
             git push origin "$TAG"
           else
