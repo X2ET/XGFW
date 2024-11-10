@@ -1,8 +1,8 @@
 package internal
 
 import (
-	"github.com/apernet/OpenGFW/analyzer"
-	"github.com/apernet/OpenGFW/analyzer/utils"
+	"github.com/X2ET/XGFW/analyzer"
+	"github.com/X2ET/XGFW/analyzer/utils"
 )
 
 // TLS record types.
