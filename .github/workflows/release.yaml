@@ -1,51 +1,55 @@
 name: Release
 on:
-  push:
-    tags:
-      - "*"  # Trigger on push to any tag
-  workflow_dispatch:  # Allow manual triggering
+  release:
+    types: [published]
+  workflow_dispatch: # Allows manual triggering of the workflow
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  release-binaries:
-    name: Release Go Binary for Selected Architectures
+  releases-matrix:
+    name: Release Go Binary
     runs-on: ubuntu-latest
     strategy:
       matrix:
         goos: [linux]
-        goarch: ["386", "amd64", "arm64"]
+        goarch: ["386", amd64, arm64]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
 
-      - name: Set Tag Name
-        id: tag_name
+      # Ensure a tag exists, create one if running manually
+      - name: Ensure Git Tag
+        id: tag
         run: |
-          # Extract the tag name by removing the 'refs/tags/' prefix
-          echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Create a new tag based on the current date-time or use latest commit SHA
+            TAG="manual-$(date +'%Y%m%d%H%M%S')"
+            git tag "$TAG"
+            git push origin "$TAG"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "::set-output name=TAG::$TAG"
 
-      - name: Build Binary
+      - name: Build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
           mkdir -p build
-          go build -o "build/OpenGFW-${{ matrix.goos }}-${{ matrix.goarch }}" -ldflags "-s -w" .
+          go build -o build/OpenGFW-${GOOS}-${GOARCH} -ldflags "-s -w" .
 
-      - name: Upload Binary
+      - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: "build/*"  # Upload all binaries in the build folder
-          tag_name: ${{ env.TAG_NAME }}  # Use the extracted tag name
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: build/*
+          tag_name: ${{ steps.tag.outputs.TAG }}
