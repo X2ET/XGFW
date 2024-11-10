@@ -11,18 +11,12 @@ permissions:
 
 jobs:
   release-binaries:
-    name: Release Go Binary for Multiple Architectures
+    name: Release Go Binary for Selected Architectures
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform:
-          - amd64
-          - arm64
-          - armv7
-          - armv6
-          - armv5
-          - 386
-          - s390x
+        goos: [linux]
+        goarch: ["386", "amd64", "arm64"]  # Reduced to 386, amd64, and arm64
 
     steps:
       - name: Checkout repository
@@ -31,57 +25,21 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          if [ "${{ matrix.platform }}" == "arm64" ]; then
-            sudo apt install gcc-aarch64-linux-gnu
-          elif [ "${{ matrix.platform }}" == "armv7" ]; then
-            sudo apt install gcc-arm-linux-gnueabihf
-          elif [ "${{ matrix.platform }}" == "armv6" ]; then
-            sudo apt install gcc-arm-linux-gnueabihf
-          elif [ "${{ matrix.platform }}" == "armv5" ]; then
-            sudo apt install gcc-arm-linux-gnueabi
-          elif [ "${{ matrix.platform }}" == "386" ]; then
-            sudo apt install gcc-i686-linux-gnu
-          elif [ "${{ matrix.platform }}" == "s390x" ]; then
-            sudo apt install gcc-s390x-linux-gnu
-          fi
+          go-version: "1.22"
 
       - name: Build Binary
         env:
-          GOOS: linux
-          GOARCH: ${{ matrix.platform }}
-          CGO_ENABLED: 1
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
         run: |
-          # Set up platform-specific environment variables if needed
-          if [ "${{ matrix.platform }}" == "arm64" ]; then
-            export CC=aarch64-linux-gnu-gcc
-          elif [ "${{ matrix.platform }}" == "armv7" ]; then
-            export GOARM=7
-            export CC=arm-linux-gnueabihf-gcc
-          elif [ "${{ matrix.platform }}" == "armv6" ]; then
-            export GOARM=6
-            export CC=arm-linux-gnueabihf-gcc
-          elif [ "${{ matrix.platform }}" == "armv5" ]; then
-            export GOARM=5
-            export CC=arm-linux-gnueabi-gcc
-          elif [ "${{ matrix.platform }}" == "386" ]; then
-            export CC=i686-linux-gnu-gcc
-          elif [ "${{ matrix.platform }}" == "s390x" ]; then
-            export CC=s390x-linux-gnu-gcc
-          fi
-
-          # Build binary
-          go build -o "OpenGFW-${{ matrix.platform }}" -ldflags "-s -w" .
+          mkdir -p build
+          go build -o "build/OpenGFW-${{ matrix.goos }}-${{ matrix.goarch }}" -ldflags "-s -w" .
 
       - name: Upload Binary
         uses: softprops/action-gh-release@v2
         with:
-          files: "OpenGFW-${{ matrix.platform }}"  # Upload individual file
-          tag_name: ${{ github.ref }}  # Tag is necessary to associate with the release
-          prerelease: true  # Set to true if you want a pre-release; otherwise, remove this line
+          files: "build/*"  # Upload all binaries in the build folder
+          tag_name: ${{ github.ref }}  # Tag associated with the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
