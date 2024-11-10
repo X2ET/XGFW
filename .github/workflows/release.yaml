@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         goos: [linux]
-        goarch: ["386", "amd64", "arm64"]  # Reduced to 386, amd64, and arm64
+        goarch: ["386", "amd64", "arm64"]
 
     steps:
       - name: Checkout repository
@@ -26,6 +26,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+
+      - name: Set Tag Name
+        id: tag_name
+        run: |
+          # Extract the tag name by removing the 'refs/tags/' prefix
+          echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Build Binary
         env:
@@ -40,6 +46,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: "build/*"  # Upload all binaries in the build folder
-          tag_name: ${{ github.ref }}  # Tag associated with the release
+          tag_name: ${{ env.TAG_NAME }}  # Use the extracted tag name
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
